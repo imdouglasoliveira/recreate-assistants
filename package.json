@@ -1,0 +1,47 @@
+{
+  "name": "recriar-assistants",
+  "version": "1.0.0",
+  "description": "Ferramenta para clonar/replicar OpenAI Assistants entre Organizations e Projects",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "clone:plan": "tsx src/cli/plan.ts",
+    "clone:apply": "tsx src/cli/apply.ts",
+    "clone:export": "tsx src/cli/export.ts",
+    "clone:import": "tsx src/cli/import.ts",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "keywords": [
+    "openai",
+    "assistants",
+    "clone",
+    "migration",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "openai": "^4.77.3",
+    "commander": "^12.1.0",
+    "chalk": "^5.3.0",
+    "ora": "^8.1.1",
+    "p-limit": "^6.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2",
+    "tsx": "^4.19.2",
+    "eslint": "^9.16.0",
+    "prettier": "^3.4.2",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
