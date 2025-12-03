@@ -24,12 +24,12 @@ export class AssistantCloner {
   }
 
   /**
-   * Planeja a clonagem (dry-run)
+   * Plan cloning (dry-run)
    */
   async plan(): Promise<CloneResult[]> {
-    logger.info('Iniciando planejamento...');
+    logger.info('Starting planning...');
     const assistants = await this.getAssistantsToClone();
-    logger.info(`Encontrados ${assistants.length} assistants para clonar`);
+    logger.info(`Found ${assistants.length} assistants to clone`);
 
     const results: CloneResult[] = [];
 
@@ -55,17 +55,17 @@ export class AssistantCloner {
   }
 
   /**
-   * Executa a clonagem
+   * Execute cloning
    */
   async clone(): Promise<CloneResult[]> {
     if (this.config.dryRun) {
-      logger.info('Modo DRY-RUN ativado - nenhuma alteração será feita');
+      logger.info('DRY-RUN mode enabled - no changes will be made');
       return this.plan();
     }
 
-    logger.info('Iniciando clonagem...');
+    logger.info('Starting cloning...');
     const assistants = await this.getAssistantsToClone();
-    logger.info(`Encontrados ${assistants.length} assistants para clonar`);
+    logger.info(`Found ${assistants.length} assistants to clone`);
 
     const limit = pLimit(this.config.maxConcurrency);
     const results = await Promise.all(
@@ -76,7 +76,7 @@ export class AssistantCloner {
   }
 
   /**
-   * Clona um assistant individual
+   * Clone an individual assistant
    */
   private async cloneAssistant(srcAssistant: AssistantSnapshot): Promise<CloneResult> {
     const result: CloneResult = {
@@ -90,7 +90,7 @@ export class AssistantCloner {
     };
 
     try {
-      logger.info(`Clonando assistant: ${srcAssistant.name} (${srcAssistant.id})`);
+      logger.info(`Cloning assistant: ${srcAssistant.name} (${srcAssistant.id})`);
 
       // Check if already exists
       const existing = await this.dstProvider.findByMetadata('cloned_from', srcAssistant.id);
@@ -118,7 +118,7 @@ export class AssistantCloner {
 
       if (existing) {
         // Update existing
-        logger.info(`Assistant já existe no destino, atualizando: ${existing.id}`);
+        logger.info(`Assistant already exists in destination, updating: ${existing.id}`);
         dstAssistant = await retryWithBackoff(() =>
           this.dstProvider.updateAssistant(existing.id, payload)
         );
@@ -132,7 +132,7 @@ export class AssistantCloner {
       }
 
       result.dstId = dstAssistant.id;
-      logger.success(`Assistant clonado: ${srcAssistant.id} -> ${dstAssistant.id}`);
+      logger.success(`Assistant cloned: ${srcAssistant.id} -> ${dstAssistant.id}`);
 
       // Clone File Search (if enabled)
       if (this.config.includeFileSearch && srcAssistant.tool_resources?.file_search) {
@@ -140,7 +140,7 @@ export class AssistantCloner {
           await this.cloneFileSearch(srcAssistant, dstAssistant);
           result.operations.file_search = 'cloned';
         } catch (error: any) {
-          logger.error(`Erro ao clonar File Search: ${error.message}`);
+          logger.error(`Error cloning File Search: ${error.message}`);
           result.operations.file_search = 'failed';
         }
       }
@@ -151,14 +151,14 @@ export class AssistantCloner {
           await this.cloneCodeInterpreter(srcAssistant, dstAssistant);
           result.operations.code_interpreter = 'cloned';
         } catch (error: any) {
-          logger.error(`Erro ao clonar Code Interpreter: ${error.message}`);
+          logger.error(`Error cloning Code Interpreter: ${error.message}`);
           result.operations.code_interpreter = 'failed';
         }
       }
 
       result.status = 'success';
     } catch (error: any) {
-      logger.error(`Erro ao clonar assistant ${srcAssistant.id}:`, error);
+      logger.error(`Error cloning assistant ${srcAssistant.id}:`, error);
       result.status = 'failed';
       result.operations.assistant = 'failed';
       result.error = error.message;
@@ -168,7 +168,7 @@ export class AssistantCloner {
   }
 
   /**
-   * Clona File Search (vector stores + arquivos)
+   * Clone File Search (vector stores + files)
    */
   private async cloneFileSearch(
     srcAssistant: AssistantSnapshot,
@@ -177,14 +177,14 @@ export class AssistantCloner {
     const vsIds = srcAssistant.tool_resources?.file_search?.vector_store_ids || [];
     if (vsIds.length === 0) return;
 
-    logger.info(`Clonando ${vsIds.length} vector store(s)...`);
+    logger.info(`Cloning ${vsIds.length} vector store(s)...`);
     const newVectorStoreIds: string[] = [];
 
     for (const vsId of vsIds) {
       const vs = await this.srcProvider.getVectorStore(vsId);
       const files = await this.srcProvider.listVectorStoreFiles(vsId);
 
-      logger.info(`Vector Store ${vsId}: ${files.length} arquivo(s)`);
+      logger.info(`Vector Store ${vsId}: ${files.length} file(s)`);
       const newFileIds: string[] = [];
 
       for (const file of files) {
@@ -201,9 +201,9 @@ export class AssistantCloner {
           );
 
           newFileIds.push(newFile.id);
-          logger.debug(`Arquivo clonado: ${file.id} -> ${newFile.id}`);
+          logger.debug(`File cloned: ${file.id} -> ${newFile.id}`);
         } catch (error: any) {
-          logger.warn(`Falha ao clonar arquivo ${file.id}: ${error.message}`);
+          logger.warn(`Failed to clone file ${file.id}: ${error.message}`);
         }
       }
 
@@ -213,7 +213,7 @@ export class AssistantCloner {
       );
 
       newVectorStoreIds.push(newVs.id);
-      logger.success(`Vector Store clonado: ${vsId} -> ${newVs.id}`);
+      logger.success(`Vector Store cloned: ${vsId} -> ${newVs.id}`);
     }
 
     // Update assistant with new vector stores
@@ -225,11 +225,11 @@ export class AssistantCloner {
       },
     });
 
-    logger.success('File Search clonado com sucesso');
+    logger.success('File Search cloned successfully');
   }
 
   /**
-   * Clona Code Interpreter (arquivos)
+   * Clone Code Interpreter (files)
    */
   private async cloneCodeInterpreter(
     srcAssistant: AssistantSnapshot,
@@ -238,7 +238,7 @@ export class AssistantCloner {
     const fileIds = srcAssistant.tool_resources?.code_interpreter?.file_ids || [];
     if (fileIds.length === 0) return;
 
-    logger.info(`Clonando ${fileIds.length} arquivo(s) do Code Interpreter...`);
+    logger.info(`Cloning ${fileIds.length} Code Interpreter file(s)...`);
     const newFileIds: string[] = [];
 
     for (const fileId of fileIds) {
@@ -253,9 +253,9 @@ export class AssistantCloner {
         );
 
         newFileIds.push(newFile.id);
-        logger.debug(`Arquivo clonado: ${fileId} -> ${newFile.id}`);
+        logger.debug(`File cloned: ${fileId} -> ${newFile.id}`);
       } catch (error: any) {
-        logger.warn(`Falha ao clonar arquivo ${fileId}: ${error.message}`);
+        logger.warn(`Failed to clone file ${fileId}: ${error.message}`);
       }
     }
 
@@ -268,11 +268,11 @@ export class AssistantCloner {
       },
     });
 
-    logger.success('Code Interpreter clonado com sucesso');
+    logger.success('Code Interpreter cloned successfully');
   }
 
   /**
-   * Obtém a lista de assistants para clonar baseado na configuração
+   * Get the list of assistants to clone based on configuration
    */
   private async getAssistantsToClone(): Promise<AssistantSnapshot[]> {
     const allAssistants = await this.srcProvider.listAllAssistants();
@@ -283,20 +283,20 @@ export class AssistantCloner {
 
       case 'by_id':
         if (!this.config.cloneIds || this.config.cloneIds.length === 0) {
-          throw new Error('CLONE_IDS não definido para modo by_id');
+          throw new Error('CLONE_IDS not defined for by_id mode');
         }
         return allAssistants.filter(a => this.config.cloneIds!.includes(a.id));
 
       case 'by_name':
         if (!this.config.cloneNamePrefix) {
-          throw new Error('CLONE_NAME_PREFIX não definido para modo by_name');
+          throw new Error('CLONE_NAME_PREFIX not defined for by_name mode');
         }
         return allAssistants.filter(a =>
           a.name.toLowerCase().includes(this.config.cloneNamePrefix!.toLowerCase())
         );
 
       default:
-        throw new Error(`Modo de clonagem inválido: ${this.config.cloneMode}`);
+        throw new Error(`Invalid clone mode: ${this.config.cloneMode}`);
     }
   }
 }

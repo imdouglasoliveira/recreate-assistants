@@ -20,7 +20,7 @@ export class OpenAIProvider {
   }
 
   /**
-   * Lista todos os assistants (com paginação)
+   * List all assistants (with pagination)
    */
   async listAllAssistants(): Promise<AssistantSnapshot[]> {
     const assistants: AssistantSnapshot[] = [];
@@ -43,7 +43,7 @@ export class OpenAIProvider {
   }
 
   /**
-   * Recupera um assistant específico
+   * Retrieve a specific assistant
    */
   async getAssistant(assistantId: string): Promise<AssistantSnapshot> {
     const assistant = await this.client.beta.assistants.retrieve(assistantId);
@@ -51,7 +51,7 @@ export class OpenAIProvider {
   }
 
   /**
-   * Cria um novo assistant
+   * Create a new assistant
    */
   async createAssistant(snapshot: Omit<AssistantSnapshot, 'id'>): Promise<AssistantSnapshot> {
     const assistant = await this.client.beta.assistants.create({
@@ -70,7 +70,7 @@ export class OpenAIProvider {
   }
 
   /**
-   * Atualiza um assistant existente
+   * Update an existing assistant
    */
   async updateAssistant(assistantId: string, snapshot: Partial<AssistantSnapshot>): Promise<AssistantSnapshot> {
     const assistant = await this.client.beta.assistants.update(assistantId, {
@@ -90,7 +90,7 @@ export class OpenAIProvider {
   }
 
   /**
-   * Procura assistant por metadata
+   * Find assistant by metadata
    */
   async findByMetadata(key: string, value: string): Promise<AssistantSnapshot | null> {
     const assistants = await this.listAllAssistants();
@@ -98,7 +98,7 @@ export class OpenAIProvider {
   }
 
   /**
-   * Lista arquivos de um vector store
+   * List files from a vector store
    */
   async listVectorStoreFiles(vectorStoreId: string): Promise<VectorStoreFile[]> {
     const files: VectorStoreFile[] = [];
@@ -121,7 +121,7 @@ export class OpenAIProvider {
   }
 
   /**
-   * Recupera informações de um arquivo
+   * Retrieve file information
    */
   async getFile(fileId: string): Promise<FileObject> {
     const file = await this.client.files.retrieve(fileId);
@@ -129,7 +129,7 @@ export class OpenAIProvider {
   }
 
   /**
-   * Baixa o conteúdo de um arquivo
+   * Download file content
    */
   async downloadFileContent(fileId: string): Promise<Buffer> {
     const response = await this.client.files.content(fileId);
@@ -138,7 +138,7 @@ export class OpenAIProvider {
   }
 
   /**
-   * Faz upload de um arquivo
+   * Upload a file
    */
   async uploadFile(content: Buffer, filename: string, purpose: 'assistants' = 'assistants'): Promise<FileObject> {
     const file = new File([content], filename);
@@ -150,7 +150,7 @@ export class OpenAIProvider {
   }
 
   /**
-   * Cria um vector store
+   * Create a vector store
    */
   async createVectorStore(name: string, fileIds: string[]): Promise<VectorStore> {
     const vectorStore = await this.client.beta.vectorStores.create({
@@ -161,7 +161,7 @@ export class OpenAIProvider {
   }
 
   /**
-   * Recupera um vector store
+   * Retrieve a vector store
    */
   async getVectorStore(vectorStoreId: string): Promise<VectorStore> {
     const vectorStore = await this.client.beta.vectorStores.retrieve(vectorStoreId);
@@ -169,7 +169,7 @@ export class OpenAIProvider {
   }
 
   /**
-   * Mapeia Assistant da API para AssistantSnapshot
+   * Map API Assistant to AssistantSnapshot
    */
   private mapToSnapshot(assistant: any): AssistantSnapshot {
     return {
