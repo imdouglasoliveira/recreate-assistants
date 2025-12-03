@@ -1,272 +1,265 @@
-# PRD + ADR - Replicador de Assistants entre Organizations/Projects
+# PRD + ADR - Assistants Replicator
 
-## Contexto Importante
+## Important Context
 
-⚠️ A **Assistants API v2** está em caminho de **migração/depreciação**, com alvo de sunset **no 1º semestre de 2026**. A OpenAI recomenda a **Responses API** como caminho novo.
+⚠️ The **Assistants API v2** is on a **deprecation path** with sunset targeted for **Q2 2026**. OpenAI recommends the **Responses API** as the new approach.
 
-Ainda assim, é possível clonar via Assistants v2 hoje e desenhar o projeto com um "adapter" para migrar depois.
+It's still possible to clone via Assistants v2 today and design the project with an "adapter" for future migration.
 
-**Referências:**
+**Reference:**
 - [Assistants API (v2) FAQ](https://help.openai.com/en/articles/8550641-assistants-api-v2-faq)
 
 ---
 
-# PRD — Replicador de Assistants entre Organizations/Projects
+# PRD — Assistants Replicator Between Organizations/Projects
 
-## 1. Objetivo
+## 1. Objective
 
-Construir uma aplicação (CLI e/ou serviço) que:
+Build an application (CLI and/or service) that:
 
-- Lê todos (ou um subconjunto) dos **Assistants** de um **projeto/origem**
-- Cria (ou atualiza) Assistants equivalentes em um **projeto/destino** em **outra Organization**
-- Replica integralmente as configurações do Assistant:
+- Reads all (or a subset) of **Assistants** from a **source project**
+- Creates (or updates) equivalent Assistants in a **destination project** in **another Organization**
+- Fully replicates Assistant configurations:
   - **name, description, instructions**
   - **model**
   - **temperature, top_p**
   - **response_format**
-  - **tools**, incluindo **Functions** (tool `type:function`) com `name`, `description` e `parameters` (JSON Schema)
-- (Opcional) Replica também recursos de ferramentas hospedadas:
-  - **File Search** (vector stores + arquivos)
-  - **Code Interpreter** (arquivos anexados, quando houver)
+  - **tools**, including **Functions** (tool `type:function`) with `name`, `description`, and `parameters` (JSON Schema)
+- (Optional) Also replicates hosted tool resources:
+  - **File Search** (vector stores + files)
+  - **Code Interpreter** (attached files)
 
-## 2. Motivação / Problema
+## 2. Motivation / Problem
 
-- No Playground existe "Clone", mas isso tende a ser **dentro do mesmo contexto** (mesma org/projeto)
-- Você quer um **clone cross-org** com automação e repetível (CI/CD / IaC)
-- Cenário típico: migrar/espelhar ambientes (dev → prod), ou duplicar um conjunto de Assistants entre unidades (org A → org B)
+- Playground has "Clone" but it works **within the same context** (same org/project)
+- Need **cross-org clone** with automation and repeatability (CI/CD / IaC)
+- Typical scenario: migrate/mirror environments (dev → prod), or duplicate Assistants between units (org A → org B)
 
 ## 3. Stakeholders
 
-- Você (dev/owner)
-- Time de automação
-- Operações
+- Developer/owner
+- Automation team
+- Operations
 
-## 4. Escopo
+## 4. Scope
 
 ### In-scope
 
-- ✅ Clone de Assistants via API
-- ✅ Clone do **catálogo de Functions** vinculadas ao Assistant
-- ✅ Modo **dry-run**
-- ✅ "Update if exists" (idempotência via `metadata.cloned_from`)
-- ✅ Export/Import em JSON (snapshot)
+- ✅ Clone Assistants via API
+- ✅ Clone **Function catalog** linked to Assistant
+- ✅ **Dry-run** mode
+- ✅ Export/import snapshots (JSON)
+- ✅ Idempotency via metadata
+- ✅ (Optional) Clone File Search resources
+- ✅ (Optional) Clone Code Interpreter files
+- ✅ Progress reporting
+- ✅ Error handling with retries
 
-### Out-of-scope (neste PRD)
+### Out-of-scope
 
-- ❌ Migrar threads, mensagens, runs históricos
-- ❌ Sincronização contínua em tempo real (pode virar fase 2)
-- ❌ Garantir que as Functions "funcionem" sem você portar o backend que executa as chamadas (a OpenAI **não executa** suas funções; ela só sugere a chamada)
+- ❌ Thread cloning (conversation history)
+- ❌ Function execution implementation
+- ❌ Real-time sync
+- ❌ GUI (CLI only)
 
-## 5. Requisitos Funcionais (FR)
+## 5. Requirements
 
-### FR1 — Listar assistants da origem
+### Functional
 
-Buscar todos os Assistants (paginação, se necessário).
+**FR-1: Clone Basic Assistant**
+- Read assistant from source
+- Create equivalent in destination
+- Preserve all configuration fields
 
-### FR2 — Clonar definição do assistant
+**FR-2: Clone Functions**
+- Include all function tool definitions
+- Preserve schemas and descriptions
 
-Para cada assistant selecionado, recuperar detalhes completos e criar no destino mantendo:
+**FR-3: Clone Modes**
+- `all`: Clone all assistants
+- `by_id`: Clone specific IDs
+- `by_name`: Clone by name pattern
 
-- `name`, `description`, `instructions`, `model`
-- `tools` (incluindo `type:function` e schema)
-- `temperature`, `top_p`, `response_format`
-- `metadata` (acrescentar `cloned_from`, `src_project`, `src_org`, timestamp)
+**FR-4: Dry Run**
+- Preview what would be cloned
+- No actual API writes
 
-### FR3 — Idempotência
+**FR-5: Idempotency**
+- Use `metadata.cloned_from` to track
+- Avoid duplicate clones
 
-Se já existir no destino um assistant com `metadata.cloned_from == <src_assistant_id>`, fazer **update** ao invés de criar novo.
+**FR-6: Export/Import**
+- Export assistants to JSON
+- Import from JSON snapshots
 
-### FR4 — Clonar File Search (opcional, feature flag)
+### Non-Functional
 
-Se o assistant tiver File Search habilitado (`tools` inclui `file_search`), recriar no destino:
+**NFR-1: Performance**
+- Handle rate limits with backoff
+- Support concurrent operations (configurable)
 
-- Criar **vector store** no destino e adicionar arquivos
-- Anexar o vector store ao assistant destino em `tool_resources`
-- Respeitar limitações conhecidas:
-  - 1 vector store por assistant
-  - 10k arquivos por vector store
-  - Limites de tamanho/storage
+**NFR-2: Reliability**
+- Retry on transient errors (429, 5xx)
+- Generate detailed error logs
 
-### FR5 — Clonar Code Interpreter (opcional, feature flag)
+**NFR-3: Security**
+- API keys in environment variables
+- Never log sensitive data
 
-Se o assistant tiver Code Interpreter e houver arquivos anexados, re-upar no destino e associar conforme a API suportar.
+**NFR-4: Observability**
+- Structured logging
+- Progress indicators
+- Final summary report
 
-### FR6 — Relatório final
+## 6. Technical Design
 
-Gerar um arquivo `mapping.json` com:
-
-- `src_assistant_id → dst_assistant_id`
-- status, erros, timestamps
-
-## 6. Requisitos Não-Funcionais (NFR)
-
-- **Segurança**: chaves só por ENV/secret manager; jamais logar keys
-- **Observabilidade**: logs estruturados + modo verbose
-- **Resiliência**: retries com backoff para 429/5xx
-- **Rate limiting**: respeitar limites de Assistants API (GET/POST/DELETE possuem RPM padrões)
-
-## 7. Premissas / Restrições
-
-1. **Recursos não são "transferíveis" entre projetos**: IDs de arquivos/vector stores não "existem" no destino; precisa recriar
-2. **Functions** no Playground são *definições* (schema) — executar o call é responsabilidade do seu app
-3. Para clonar entre **Organizations diferentes**, você precisa de credenciais com acesso em **ambas** (idealmente **project API keys** de cada projeto, uma por org). A API também suporta headers para escolher org/projeto quando aplicável (`OpenAI-Organization` / `OpenAI-Project`)
-
----
-
-# ADR — Decisões de Arquitetura
-
-## ADR-001 — API-alvo: Assistants v2 agora, com "adapter" p/ Responses depois
-
-### Decisão
-
-Implementar a clonagem usando **Assistants API v2** (para reproduzir exatamente o que você configurou no Playground hoje), mas isolar chamadas em um módulo `openaiProvider` para futura migração.
-
-### Justificativa
-
-- Você quer clonar "como está" (incluindo configuração do Assistant)
-- Mas existe roadmap de migração para Responses API e sunset da Assistants API v2 (1H 2026)
-
-### Consequência
-
-Código terá camadas:
+### Architecture
 
 ```
-domain/              # modelo de AssistantSnapshot
-providers/
-  openai_assistants_v2/   # calls atuais
-  openai_responses/       # placeholder futuro
+┌─────────────┐
+│     CLI     │
+└──────┬──────┘
+       │
+       v
+┌─────────────┐
+│   Config    │ ← .env
+│   Loader    │
+└──────┬──────┘
+       │
+       v
+┌─────────────┐
+│   Cloner    │
+│   Service   │
+└──────┬──────┘
+       │
+       ├──> [Source OpenAI API]
+       ├──> [Dest OpenAI API]
+       │
+       v
+┌─────────────┐
+│  Reporter   │ → mapping.json
+└─────────────┘   report.md
 ```
 
-## ADR-002 — Idempotência via metadata
+### Key Components
 
-### Decisão
+**1. Config Loader**
+- Loads `.env` configuration
+- Validates required fields
+- Provides defaults
 
-Adicionar `metadata.cloned_from = <src_assistant_id>` no assistant do destino e usar isso como chave.
+**2. Cloner Service**
+- Implements cloning logic
+- Handles API calls with retry
+- Manages concurrency
 
-### Consequência
+**3. Reporter**
+- Generates mapping file
+- Creates summary report
+- Logs progress
 
-- Permite reexecutar o clone sem duplicar
-- Facilita "sync" incremental (fase 2)
+### API Endpoints Used
 
----
+- `GET /v1/assistants` - List assistants
+- `GET /v1/assistants/{id}` - Get assistant details
+- `POST /v1/assistants` - Create assistant
+- `POST /v1/assistants/{id}` - Update assistant
+- `GET /v1/files/{id}/content` - Download file
+- `POST /v1/files` - Upload file
+- `POST /v1/vector_stores` - Create vector store
+- `GET /v1/vector_stores/{id}/files` - List VS files
 
-# Riscos e Mitigação
+## 7. ADRs (Architecture Decision Records)
 
-| Risco | Impacto | Mitigação |
-|-------|---------|-----------|
-| **429 / rate limit** | Alto | Implementar fila e `MAX_CONCURRENCY`, retry com backoff |
-| **Erros de org/projeto** | Médio | Orientar uso correto de headers/chaves e mensagens claras |
-| **Assistants API sunset** | Alto | Colocar "adapter" p/ migração para Responses API (ADR-001) |
-| **Custos de storage** | Médio | Feature flags para File Search/Code Interpreter opcionais |
-| **Falhas no upload de arquivos** | Médio | Retry logic, validação de formato/tamanho |
+### ADR-1: Use TypeScript + Node.js
 
----
+**Decision:** Implement in TypeScript with Node.js runtime
 
-# Checklist de Entrega (Definition of Done)
+**Rationale:**
+- OpenAI SDK available for TypeScript
+- Async/await for API calls
+- Type safety reduces errors
+- Easy deployment
 
-- [ ] `.env.example` com todas variáveis
-- [ ] CLI funcionando: `plan/apply/export/import`
-- [ ] `mapping.json` + `report.md`
-- [ ] Logs estruturados
-- [ ] Idempotência via `metadata.cloned_from`
-- [ ] Feature flags para File Search / Code Interpreter
-- [ ] Documentação rápida "Como rodar"
-- [ ] Testes unitários para funções críticas
-- [ ] Tratamento de erros com mensagens claras
+**Alternatives considered:**
+- Python: Good SDK but less type safety
+- Go: Fast but less familiar ecosystem
 
----
+### ADR-2: CLI-first, No GUI
 
-# Especificação do Produto
+**Decision:** Build as CLI tool only
 
-## CLI Commands
+**Rationale:**
+- Simpler to implement
+- CI/CD friendly
+- Automation-first approach
+- GUI can be added later if needed
 
-### 1. `clone-assistants plan`
+### ADR-3: Use Metadata for Idempotency
 
-Mostra o que seria criado/atualizado (dry-run implícito).
+**Decision:** Track clones via `metadata.cloned_from`
 
-**Saída:**
-- Lista de assistants a serem clonados
-- Operação para cada um (create/update)
-- Recursos adicionais (files, vector stores)
+**Rationale:**
+- Built into API
+- Survives updates
+- No external database needed
 
-### 2. `clone-assistants apply`
+**Trade-offs:**
+- Metadata is mutable
+- Not foolproof but good enough
 
-Executa clonagem.
+### ADR-4: Optional File Cloning
 
-**Comportamento:**
-- Cria/atualiza assistants
-- Copia files/vector stores (se habilitado)
-- Gera relatório ao final
+**Decision:** Make File Search/Code Interpreter cloning optional via flags
 
-### 3. `clone-assistants export`
+**Rationale:**
+- Can be expensive (time + $$$)
+- Not always needed
+- User can opt-in
 
-Exporta snapshots para JSON (IaC).
+### ADR-5: Fail Fast on Critical Errors
 
-**Saída:**
-- `assistants-snapshot.json` com todas configurações
+**Decision:** Stop on authentication failures, continue on assistant-level errors
 
-### 4. `clone-assistants import`
+**Rationale:**
+- Auth errors = misconfiguration
+- Individual assistant failures shouldn't stop batch
 
-Importa snapshots num destino (sem depender da origem).
+## 8. Risks and Mitigation
 
-**Entrada:**
-- `assistants-snapshot.json`
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Rate limits (429) | High | Exponential backoff, configurable concurrency |
+| File download failures | Medium | Retry logic, skip on persistent failure |
+| API deprecation | High | Design adapter layer for future Responses API |
+| Large file costs | Medium | Make optional, warn user |
+| Metadata collisions | Low | Use UUID in metadata if needed |
 
-## Critérios de Aceite
+## 9. Delivery Checklist
 
-- ✅ Clonar um assistant com 3 functions preserva:
-  - nomes, descrições, schemas (`parameters`) e ordem/estrutura
-- ✅ Reexecução não cria duplicados (idempotência via metadata)
-- ✅ Suporta seleção por ID e por nome
-- ✅ File Search: arquivos são transferidos e vector store recriado
-- ✅ Code Interpreter: arquivos são transferidos
-- ✅ Dry-run mostra exatamente o que será feito
-- ✅ Relatório final tem mapeamento de IDs origem→destino
+- [x] Config loader with .env support
+- [x] Basic assistant cloning
+- [x] Function definitions cloning
+- [x] Dry-run mode
+- [x] Idempotency via metadata
+- [x] Export/import JSON
+- [x] File Search cloning (optional)
+- [x] Code Interpreter cloning (optional)
+- [x] Error handling and retries
+- [x] Progress reporting
+- [x] Documentation (README, QUICKSTART, docs/)
+- [x] Example .env file
 
-## Estrutura de Dados
+## 10. Future Enhancements
 
-### AssistantSnapshot
+- Thread cloning (Phase 2)
+- Real-time sync mode
+- Web UI dashboard
+- Webhook notifications
+- Migration to Responses API adapter
 
-```typescript
-type AssistantSnapshot = {
-  id: string
-  name: string
-  description?: string
-  instructions: string
-  model: string
-  temperature?: number
-  top_p?: number
-  response_format?: any
-  tools: Tool[]
-  tool_resources?: ToolResources
-  metadata?: Record<string, string>
-}
+## References
 
-type Tool = {
-  type: 'function' | 'file_search' | 'code_interpreter'
-  function?: {
-    name: string
-    description: string
-    parameters: object  // JSON Schema
-  }
-}
-
-type ToolResources = {
-  file_search?: {
-    vector_store_ids: string[]
-  }
-  code_interpreter?: {
-    file_ids: string[]
-  }
-}
-```
-
----
-
-# Referências
-
-- [Assistants API (v2) FAQ](https://help.openai.com/en/articles/8550641-assistants-api-v2-faq)
-- [Assistants Function Calling](https://platform.openai.com/docs/assistants/tools/function-calling?utm_source=chatgpt.com)
-- [API Reference - Assistants](https://platform.openai.com/docs/api-reference/assistants?utm_source=chatgpt.com)
-- [Production best practices](https://platform.openai.com/docs/guides/production-best-practices/setting-up-your-organization?utm_source=chatgpt.com)
-- [Error codes](https://platform.openai.com/docs/guides/error-codes?utm_source=chatgpt.com)
+- [OpenAI Assistants API](https://platform.openai.com/docs/api-reference/assistants)
+- [Managing Projects](https://help.openai.com/en/articles/9186755-managing-your-work-in-the-api-platform-with-projects)
+- [Production Best Practices](https://platform.openai.com/docs/guides/production-best-practices)

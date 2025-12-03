@@ -1,332 +1,163 @@
-# Guia de Implementação - Replicador de Assistants
+# Implementation Guide
 
-## Passo 0 — Preparar Acessos
+Quick reference for implementing the Assistants cloning tool.
 
-### 1. Configurar Projects nas Organizations
+## Step 0 — Prepare Access
 
-**Org de origem:**
-1. Crie/selecione um **Project** que contenha seus Assistants
-2. Anote o ID: `proj_xxx`
+### 1. Configure Projects
 
-**Org de destino:**
-1. Crie um **Project** para receber os clones
-2. Anote o ID: `proj_yyy`
+**Source organization:**
+1. Create/select a **Project** containing your Assistants
+2. Note the ID: `proj_xxx`
 
-### 2. Gerar API Keys
+**Destination organization:**
+1. Create a **Project** to receive the clones
+2. Note the ID: `proj_yyy`
 
-Gere as seguintes chaves:
-- `SRC_PROJECT_API_KEY` (origem)
-- `DST_PROJECT_API_KEY` (destino)
+### 2. Generate API Keys
 
-**Alternativa:** usar uma "user API key" + headers `OpenAI-Organization` e `OpenAI-Project` para direcionar cobrança/escopo.
+Generate the following keys:
+- `SRC_PROJECT_API_KEY` (source)
+- `DST_PROJECT_API_KEY` (destination)
 
-**Referências:**
-- [API Reference - Certificates](https://platform.openai.com/docs/api-reference/certificates/object?utm_cta=website-workload-data-warehouse-cross-cloud&utm_source=chatgpt.com)
+**Alternative:** Use a "user API key" + headers `OpenAI-Organization` and `OpenAI-Project` to direct billing/scope.
 
----
+## Step 1 — Environment Variables
 
-## Passo 1 — Definir Variáveis de Ambiente
-
-Crie um `.env` (ou configure no seu secret manager):
+Create a `.env` file:
 
 ```bash
-# ============================================
-# OBRIGATÓRIAS
-# ============================================
+# Required
 OPENAI_SRC_API_KEY="sk-proj-..."
 OPENAI_DST_API_KEY="sk-proj-..."
 
-# ============================================
-# OPCIONAIS (úteis se você usa user-key)
-# ============================================
-OPENAI_SRC_ORG_ID="org_..."
-OPENAI_DST_ORG_ID="org_..."
-OPENAI_SRC_PROJECT_ID="proj_..."
-OPENAI_DST_PROJECT_ID="proj_..."
+# Clone mode
+CLONE_MODE="all"  # all | by_id | by_name
 
-# ============================================
-# EXECUÇÃO
-# ============================================
-
-# Modo de clonagem
-# - "all": clona todos os assistants
-# - "by_id": clona apenas IDs especificados
-# - "by_name": clona assistants com nome contendo prefixo
-CLONE_MODE="all"
-
-# IDs específicos (quando CLONE_MODE=by_id)
-CLONE_IDS="asst_abc123,asst_def456"
-
-# Prefixo de nome (opcional)
-# Ex: "PROD - " adiciona esse prefixo aos nomes no destino
-CLONE_NAME_PREFIX=""
-
-# Dry-run (não executa, apenas mostra o que seria feito)
-DRY_RUN="false"
-
-# ============================================
-# FEATURES OPCIONAIS
-# ============================================
-
-# Clonar vector stores e arquivos do File Search
+# Optional
 INCLUDE_FILE_SEARCH="false"
-
-# Clonar arquivos do Code Interpreter
 INCLUDE_CODE_INTERPRETER="false"
-
-# ============================================
-# PERFORMANCE E LOGS
-# ============================================
-
-# Máximo de operações paralelas
+CLONE_NAME_PREFIX=""
+DRY_RUN="false"
 MAX_CONCURRENCY="3"
-
-# Nível de log: debug | info | warn | error
 LOG_LEVEL="info"
-
-# Diretório de saída para relatórios
 OUTPUT_DIR="./out"
 ```
 
-**Headers suportados:**
-- `OpenAI-Organization`: direciona para uma org específica
-- `OpenAI-Project`: direciona para um projeto específico
+## Step 2 — Cloning Algorithm
 
-**Referências:**
-- [Production best practices](https://platform.openai.com/docs/guides/production-best-practices/setting-up-your-organization?utm_source=chatgpt.com)
-
----
-
-## Passo 2 — Fluxo de Clonagem (Algoritmo)
-
-### Visão Geral
-
-Para cada assistant selecionado:
+### Basic Flow
 
 ```
-1. Extrair snapshot (origem)
-2. Verificar se já existe no destino
-3. Criar/atualizar no destino
-4. (Opcional) Clonar File Search
-5. (Opcional) Clonar Code Interpreter
-6. Gerar relatório
+1. List assistants in source
+2. For each assistant:
+   a. Retrieve full definition
+   b. Create assistant in destination
+   c. If File Search enabled: clone vector stores
+   d. If Code Interpreter enabled: clone files
+3. Generate mapping report
 ```
 
-### 2.1) Extrair Snapshot do Assistant (Origem)
+### Pseudocode
 
 ```javascript
-async function extractSnapshot(srcKey, assistantId) {
-  // 1. Listar assistants
-  const list = await listAssistants(srcKey);
+async function cloneAssistants(srcKey, dstKey, config) {
+  // 1. List source assistants
+  const assistants = await listAssistants(srcKey, config.mode);
 
-  // 2. Retrieve assistant detalhado
-  const assistant = await getAssistant(srcKey, assistantId);
+  const mapping = [];
 
-  // 3. Construir snapshot
-  return {
-    id: assistant.id,
-    name: assistant.name,
-    description: assistant.description,
-    instructions: assistant.instructions,
-    model: assistant.model,
-    temperature: assistant.temperature,
-    top_p: assistant.top_p,
-    response_format: assistant.response_format,
-    tools: assistant.tools,  // inclui Functions com JSON Schema
-    tool_resources: assistant.tool_resources,
-    metadata: assistant.metadata
-  };
+  for (const asst of assistants) {
+    // 2. Create in destination
+    const newAsst = await createAssistant(dstKey, {
+      name: config.prefix + asst.name,
+      model: asst.model,
+      instructions: asst.instructions,
+      tools: asst.tools,
+      metadata: { cloned_from: asst.id }
+    });
+
+    // 3. Clone File Search if enabled
+    if (config.includeFileSearch && hasFileSearch(asst)) {
+      await cloneFileSearch(srcKey, dstKey, asst.id, newAsst.id);
+    }
+
+    // 4. Clone Code Interpreter if enabled
+    if (config.includeCodeInterpreter && hasCodeInterpreter(asst)) {
+      await cloneCodeInterpreter(srcKey, dstKey, asst.id, newAsst.id);
+    }
+
+    mapping.push({ srcId: asst.id, dstId: newAsst.id });
+  }
+
+  // 5. Generate report
+  await saveMapping(mapping, config.outputDir);
 }
 ```
 
-**Tipo de Dados:**
+## Step 3 — Validation
 
-```typescript
-type AssistantSnapshot = {
-  id: string
-  name: string
-  description?: string
-  instructions: string
-  model: string
-  temperature?: number
-  top_p?: number
-  response_format?: any
-  tools: any[]           // inclui type:function com JSON schema
-  tool_resources?: any   // file_search / code_interpreter
-  metadata?: Record<string, string>
-}
+After cloning, validate:
+
+```bash
+# Check assistant count
+src_count=$(curl -H "Authorization: Bearer $SRC_KEY" \
+  "https://api.openai.com/v1/assistants" | jq '.data | length')
+
+dst_count=$(curl -H "Authorization: Bearer $DST_KEY" \
+  "https://api.openai.com/v1/assistants" | jq '.data | length')
+
+echo "Source: $src_count, Destination: $dst_count"
 ```
 
-### 2.2) Aplicar no Destino
+## Step 4 — Error Handling
+
+### Rate Limits (429)
+
+Implement exponential backoff:
 
 ```javascript
-async function applySnapshot(dstKey, snapshot, srcAssistantId) {
-  // 1. Procurar se já existe
-  const existing = await findByMetadata(
-    dstKey,
-    'cloned_from',
-    srcAssistantId
-  );
-
-  if (existing) {
-    // Update
-    return await updateAssistant(dstKey, existing.id, {
-      name: snapshot.name,
-      description: snapshot.description,
-      instructions: snapshot.instructions,
-      model: snapshot.model,
-      temperature: snapshot.temperature,
-      top_p: snapshot.top_p,
-      response_format: snapshot.response_format,
-      tools: snapshot.tools,
-      metadata: {
-        ...snapshot.metadata,
-        cloned_from: srcAssistantId,
-        last_cloned_at: new Date().toISOString()
+async function retryWithBackoff(fn, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (error.status === 429 && i < maxRetries - 1) {
+        const delay = Math.pow(2, i) * 1000;
+        await sleep(delay);
+        continue;
       }
-    });
-  } else {
-    // Create
-    return await createAssistant(dstKey, {
-      ...snapshot,
-      metadata: {
-        ...snapshot.metadata,
-        cloned_from: srcAssistantId,
-        cloned_at: new Date().toISOString()
-      }
-    });
+      throw error;
+    }
   }
 }
 ```
 
-### 2.3) (Opcional) Clonar File Search
+### Common Errors
 
-Se `INCLUDE_FILE_SEARCH=true` e o snapshot indicar File Search:
-
-```javascript
-async function cloneFileSearch(srcKey, dstKey, srcAssistant, dstAssistant) {
-  const vsIds = srcAssistant.tool_resources?.file_search?.vector_store_ids || [];
-
-  const newVectorStoreIds = [];
-
-  for (const vsId of vsIds) {
-    // 1. Listar arquivos do vector store
-    const files = await listVectorStoreFiles(srcKey, vsId);
-
-    const newFileIds = [];
-
-    for (const file of files) {
-      // 2. Baixar conteúdo
-      const content = await downloadFileContent(srcKey, file.id);
-      const fileInfo = await getFile(srcKey, file.id);
-
-      // 3. Upload no destino
-      const newFile = await uploadFile(dstKey, {
-        file: content,
-        purpose: 'assistants',
-        filename: fileInfo.filename
-      });
-
-      newFileIds.push(newFile.id);
-    }
-
-    // 4. Criar vector store no destino
-    const newVs = await createVectorStore(dstKey, {
-      name: `Clone of ${vsId}`,
-      file_ids: newFileIds
-    });
-
-    newVectorStoreIds.push(newVs.id);
-  }
-
-  // 5. Atualizar assistant
-  await updateAssistant(dstKey, dstAssistant.id, {
-    tool_resources: {
-      file_search: {
-        vector_store_ids: newVectorStoreIds
-      }
-    }
-  });
-}
+**Invalid API Key:**
 ```
-
-**Importante:**
-- File Search usa **Vector Store**
-- Limites: 1 VS por assistant, 10k arquivos por VS
-
-**Referências:**
-- [Assistants File Search](https://platform.openai.com/docs/assistants/tools/file-search?utm_source=chatgpt.com)
-
-### 2.4) (Opcional) Clonar Code Interpreter
-
-Se `INCLUDE_CODE_INTERPRETER=true`:
-
-```javascript
-async function cloneCodeInterpreter(srcKey, dstKey, srcAssistant, dstAssistant) {
-  const fileIds = srcAssistant.tool_resources?.code_interpreter?.file_ids || [];
-
-  const newFileIds = [];
-
-  for (const fileId of fileIds) {
-    // 1. Baixar arquivo
-    const content = await downloadFileContent(srcKey, fileId);
-    const fileInfo = await getFile(srcKey, fileId);
-
-    // 2. Upload no destino
-    const newFile = await uploadFile(dstKey, {
-      file: content,
-      purpose: 'assistants',
-      filename: fileInfo.filename
-    });
-
-    newFileIds.push(newFile.id);
-  }
-
-  // 3. Atualizar assistant
-  await updateAssistant(dstKey, dstAssistant.id, {
-    tool_resources: {
-      code_interpreter: {
-        file_ids: newFileIds
-      }
-    }
-  });
-}
+401 Unauthorized
 ```
+Solution: Verify API keys in `.env`
 
----
-
-## Passo 3 — Validação / Aceite
-
-Para cada assistant clonado:
-
-### Comparação Origem vs Destino
-
-```javascript
-async function validateClone(srcKey, dstKey, srcId, dstId) {
-  const src = await getAssistant(srcKey, srcId);
-  const dst = await getAssistant(dstKey, dstId);
-
-  const checks = {
-    model: src.model === dst.model,
-    instructions: hashString(src.instructions) === hashString(dst.instructions),
-    tools: JSON.stringify(src.tools) === JSON.stringify(dst.tools),
-    temperature: src.temperature === dst.temperature,
-    top_p: src.top_p === dst.top_p,
-    response_format: JSON.stringify(src.response_format) === JSON.stringify(dst.response_format)
-  };
-
-  return {
-    srcId,
-    dstId,
-    checks,
-    allPassed: Object.values(checks).every(v => v)
-  };
-}
+**Resource Not Found:**
 ```
+404 Not Found
+```
+Solution: Check assistant/file IDs exist in source
 
-### Gerar Relatórios
+**Quota Exceeded:**
+```
+429 Too Many Requests
+```
+Solution: Reduce `MAX_CONCURRENCY` or wait
 
-**`out/mapping.json`:**
+## Step 5 — Reporting
+
+### Mapping File Format
+
+`./out/mapping.json`:
 
 ```json
 {
@@ -341,205 +172,44 @@ async function validateClone(srcKey, dstKey, srcId, dstId) {
   },
   "mappings": [
     {
-      "src_id": "asst_abc123",
-      "dst_id": "asst_xyz789",
-      "name": "Customer Support Assistant",
-      "status": "success",
-      "operations": {
-        "assistant": "created",
-        "file_search": "cloned",
-        "code_interpreter": "skipped"
-      }
+      "srcId": "asst_abc123",
+      "dstId": "asst_xyz789",
+      "name": "Customer Support",
+      "status": "success"
     }
-  ],
-  "summary": {
-    "total": 5,
-    "success": 4,
-    "failed": 1
-  }
+  ]
 }
 ```
 
-**`out/report.md`:**
+### Summary Report
+
+`./out/report.md`:
 
 ```markdown
 # Clone Report
 
-**Date:** 2024-12-03 10:30:00
-**Source:** org_xxx / proj_xxx
-**Destination:** org_yyy / proj_yyy
-
 ## Summary
+- Total: 5 assistants
+- Success: 4
+- Failed: 1
 
-- ✅ Total: 5 assistants
-- ✅ Success: 4
-- ❌ Failed: 1
+## Successful Clones
+- asst_abc123 → asst_xyz789 (Customer Support)
+- asst_def456 → asst_uvw012 (Sales Bot)
 
-## Details
-
-### ✅ Customer Support Assistant
-- **Source ID:** asst_abc123
-- **Destination ID:** asst_xyz789
-- **Operation:** Created
-- **File Search:** Cloned (2 files, 1 vector store)
-- **Functions:** 3 functions cloned
-
-### ❌ Sales Assistant
-- **Source ID:** asst_def456
-- **Error:** Rate limit exceeded (429)
-- **Retry:** Recommended
-
-...
+## Failed Clones
+- asst_ghi789: Rate limit exceeded
 ```
 
----
+## Security Considerations
 
-## Passo 4 — Executar
+1. **API Keys**: Store in environment variables, never commit to git
+2. **Secrets**: Use secret managers for production (AWS Secrets Manager, Azure Key Vault)
+3. **Audit**: Log all operations with timestamps
+4. **Permissions**: Use least-privilege API keys
 
-### Comando Plan (Dry-run)
+## References
 
-```bash
-DRY_RUN=true npm run clone:plan
-```
-
-**Saída esperada:**
-- Lista de assistants que serão clonados
-- Operação para cada um (create/update)
-- Recursos adicionais (files, vector stores)
-- Estimativa de custos
-
-### Comando Apply
-
-```bash
-npm run clone:apply
-```
-
-**Saída esperada:**
-- Progresso em tempo real
-- Logs estruturados
-- Relatório final em `out/`
-
----
-
-## Estrutura de Arquivos Recomendada
-
-```
-clone-assistants/
-├── .env.example
-├── .env
-├── src/
-│   ├── domain/
-│   │   └── AssistantSnapshot.ts
-│   ├── providers/
-│   │   └── openai/
-│   │       ├── assistants.ts
-│   │       ├── files.ts
-│   │       └── vectorStores.ts
-│   ├── services/
-│   │   ├── cloner.ts
-│   │   ├── validator.ts
-│   │   └── reporter.ts
-│   ├── cli/
-│   │   ├── plan.ts
-│   │   ├── apply.ts
-│   │   ├── export.ts
-│   │   └── import.ts
-│   └── index.ts
-├── out/
-│   ├── mapping.json
-│   └── report.md
-└── package.json
-```
-
----
-
-## Tratamento de Erros
-
-### Rate Limiting (429)
-
-```javascript
-async function retryWithBackoff(fn, maxRetries = 3) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (error.status === 429 && i < maxRetries - 1) {
-        const delay = Math.pow(2, i) * 1000; // exponential backoff
-        await sleep(delay);
-        continue;
-      }
-      throw error;
-    }
-  }
-}
-```
-
-### Validação de Headers
-
-```javascript
-function validateConfig(env) {
-  if (!env.OPENAI_SRC_API_KEY || !env.OPENAI_DST_API_KEY) {
-    throw new Error('Missing required API keys');
-  }
-
-  // Verificar formato das keys
-  if (!env.OPENAI_SRC_API_KEY.startsWith('sk-')) {
-    throw new Error('Invalid source API key format');
-  }
-}
-```
-
----
-
-## Segurança
-
-### Boas Práticas
-
-- ✅ Chaves apenas em ENV/secret manager
-- ✅ JAMAIS logar keys
-- ✅ Usar HTTPS para todas as chamadas
-- ✅ Validar entrada do usuário
-- ✅ Sanitizar logs (remover dados sensíveis)
-
-### Exemplo de Log Seguro
-
-```javascript
-function logSafe(message, data) {
-  const safe = { ...data };
-
-  // Remover keys
-  delete safe.api_key;
-  delete safe.authorization;
-
-  // Mascarar IDs sensíveis
-  if (safe.assistant_id) {
-    safe.assistant_id = maskId(safe.assistant_id);
-  }
-
-  console.log(message, safe);
-}
-
-function maskId(id) {
-  if (id.length <= 8) return '***';
-  return id.substring(0, 4) + '***' + id.substring(id.length - 4);
-}
-```
-
----
-
-## Próximos Passos
-
-1. ✅ Configure suas API keys
-2. ✅ Execute `clone:plan` para validar
-3. ✅ Execute `clone:apply` para clonar
-4. ✅ Valide os resultados no destino
-5. ✅ Configure CI/CD (opcional)
-
----
-
-## Referências
-
-- [Assistants API (v2) FAQ](https://help.openai.com/en/articles/8550641-assistants-api-v2-faq)
-- [API Reference - Assistants](https://platform.openai.com/docs/api-reference/assistants?utm_source=chatgpt.com)
-- [Error codes](https://platform.openai.com/docs/guides/error-codes?utm_source=chatgpt.com)
-- [Production best practices](https://platform.openai.com/docs/guides/production-best-practices/setting-up-your-organization?utm_source=chatgpt.com)
+- [Production best practices](https://platform.openai.com/docs/guides/production-best-practices/setting-up-your-organization)
+- [Error codes](https://platform.openai.com/docs/guides/error-codes)
+- [API Reference](https://platform.openai.com/docs/api-reference/assistants)
