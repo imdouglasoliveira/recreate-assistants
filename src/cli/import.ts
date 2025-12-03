@@ -18,45 +18,45 @@ async function main() {
   console.log('');
 
   try {
-    // Carregar configuração (apenas destination)
+    // Load configuration (destination only)
     const config = loadConfig();
     logger.setLevel(config.logLevel);
 
-    // Perguntar pelo arquivo de import
+    // Get import file path
     const args = process.argv.slice(2);
     if (args.length === 0) {
-      console.error('❌ Uso: npm run clone:import <arquivo.json>');
+      console.error('❌ Usage: npm run clone:import <file.json>');
       console.error('');
-      console.error('Exemplo:');
+      console.error('Example:');
       console.error('  npm run clone:import ./out/assistants-export-2024-12-03.json');
       console.error('');
       process.exit(1);
     }
 
     const importFile = args[0];
-    logger.info(`Importando de: ${importFile}`);
+    logger.info(`Importing from: ${importFile}`);
 
-    // Ler arquivo
+    // Read file
     const content = await fs.readFile(importFile, 'utf-8');
     const data = JSON.parse(content);
 
     if (!data.assistants || !Array.isArray(data.assistants)) {
-      throw new Error('Formato de arquivo inválido: esperado { assistants: [...] }');
+      throw new Error('Invalid file format: expected { assistants: [...] }');
     }
 
     const assistants: AssistantSnapshot[] = data.assistants;
-    logger.info(`Encontrados ${assistants.length} assistants no arquivo`);
+    logger.info(`Found ${assistants.length} assistants in file`);
     console.log('');
 
-    // Criar provider de destino
+    // Create destination provider
     const provider = new OpenAIProvider(
       config.dstApiKey,
       config.dstOrgId,
       config.dstProjectId
     );
 
-    // Importar assistants
-    const spinner = ora('Importando assistants...').start();
+    // Import assistants
+    const spinner = ora('Importing assistants...').start();
     const limit = pLimit(config.maxConcurrency);
     const results: CloneResult[] = [];
 
@@ -69,27 +69,27 @@ async function main() {
       )
     );
 
-    spinner.succeed('Import concluído!');
+    spinner.succeed('Import completed!');
 
-    // Gerar relatórios
+    // Generate reports
     const reporter = new Reporter(config);
     await reporter.generateReport(results);
 
-    // Exibir resumo
+    // Display summary
     Reporter.printSummary(results);
 
-    console.log(`📄 Relatórios salvos em: ${config.outputDir}`);
+    console.log(`📄 Reports saved to: ${config.outputDir}`);
     console.log('');
 
-    // Exit code baseado em falhas
+    // Exit code based on failures
     const failed = results.filter(r => r.status === 'failed').length;
     if (failed > 0) {
-      logger.warn(`${failed} assistants falharam. Verifique o relatório para detalhes.`);
+      logger.warn(`${failed} assistants failed. Check report for details.`);
       process.exit(1);
     }
 
   } catch (error: any) {
-    logger.error('Erro ao importar:', error);
+    logger.error('Error importing:', error);
     process.exit(1);
   }
 }
@@ -109,12 +109,12 @@ async function importAssistant(
   };
 
   try {
-    logger.info(`Importando: ${snapshot.name} (${snapshot.id})`);
+    logger.info(`Importing: ${snapshot.name} (${snapshot.id})`);
 
-    // Verificar se já existe
+    // Check if already exists
     const existing = await provider.findByMetadata('imported_from', snapshot.id);
 
-    // Preparar payload
+    // Prepare payload
     const payload = {
       ...snapshot,
       metadata: {
@@ -127,7 +127,7 @@ async function importAssistant(
     let created: AssistantSnapshot;
 
     if (existing) {
-      logger.info(`Assistant já existe, atualizando: ${existing.id}`);
+      logger.info(`Assistant already exists, updating: ${existing.id}`);
       created = await retryWithBackoff(() =>
         provider.updateAssistant(existing.id, payload)
       );
@@ -141,11 +141,11 @@ async function importAssistant(
     }
 
     result.dstId = created.id;
-    logger.success(`Importado: ${snapshot.id} -> ${created.id}`);
+    logger.success(`Imported: ${snapshot.id} -> ${created.id}`);
 
     result.status = 'success';
   } catch (error: any) {
-    logger.error(`Erro ao importar ${snapshot.id}:`, error);
+    logger.error(`Error importing ${snapshot.id}:`, error);
     result.status = 'failed';
     result.operations.assistant = 'failed';
     result.error = error.message;

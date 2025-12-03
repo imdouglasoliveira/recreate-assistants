@@ -13,12 +13,12 @@ async function main() {
   console.log('');
 
   try {
-    // Carregar configuração
+    // Load configuration
     const config = loadConfig();
     logger.setLevel(config.logLevel);
     validateConfig(config);
 
-    logger.info('Configuração carregada:');
+    logger.info('Configuration loaded:');
     logger.info(`  Mode: ${config.cloneMode}`);
     logger.info(`  Dry Run: ${config.dryRun}`);
     logger.info(`  File Search: ${config.includeFileSearch}`);
@@ -26,18 +26,18 @@ async function main() {
     logger.info(`  Max Concurrency: ${config.maxConcurrency}`);
     console.log('');
 
-    // Criar cloner
+    // Create cloner
     const cloner = new AssistantCloner(config);
 
-    // Executar plano
-    const spinner = ora('Analisando assistants...').start();
+    // Execute plan
+    const spinner = ora('Analyzing assistants...').start();
     const results = await cloner.plan();
-    spinner.succeed(`Encontrados ${results.length} assistants`);
+    spinner.succeed(`Found ${results.length} assistants`);
 
-    // Exibir plano
+    // Display plan
     console.log('');
     console.log('═══════════════════════════════════════');
-    console.log('           PLANO DE CLONAGEM');
+    console.log('           CLONING PLAN');
     console.log('═══════════════════════════════════════');
     console.log('');
 
@@ -61,14 +61,14 @@ async function main() {
       console.log('');
     }
 
-    // Exibir resumo
+    // Display summary
     Reporter.printSummary(results);
 
-    console.log('💡 Para executar a clonagem, use: npm run clone:apply');
+    console.log('💡 To execute cloning, use: npm run clone:apply');
     console.log('');
 
   } catch (error: any) {
-    logger.error('Erro ao executar plano:', error);
+    logger.error('Error executing plan:', error);
     process.exit(1);
   }
 }
