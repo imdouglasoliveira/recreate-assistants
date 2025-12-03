@@ -13,16 +13,16 @@ async function main() {
   console.log('');
 
   try {
-    // Carregar configuração
+    // Load configuration
     const config = loadConfig();
     logger.setLevel(config.logLevel);
     validateConfig(config);
 
     if (config.dryRun) {
-      logger.warn('⚠️  DRY_RUN=true: Nenhuma alteração será feita');
+      logger.warn('⚠️  DRY_RUN=true: No changes will be made');
     }
 
-    logger.info('Configuração carregada:');
+    logger.info('Configuration loaded:');
     logger.info(`  Mode: ${config.cloneMode}`);
     logger.info(`  Dry Run: ${config.dryRun}`);
     logger.info(`  File Search: ${config.includeFileSearch}`);
@@ -30,23 +30,23 @@ async function main() {
     logger.info(`  Max Concurrency: ${config.maxConcurrency}`);
     console.log('');
 
-    // Criar cloner
+    // Create cloner
     const cloner = new AssistantCloner(config);
 
-    // Executar clonagem
-    const spinner = ora('Clonando assistants...').start();
+    // Execute cloning
+    const spinner = ora('Cloning assistants...').start();
     const results = await cloner.clone();
-    spinner.succeed('Clonagem concluída!');
+    spinner.succeed('Cloning completed!');
 
-    // Gerar relatórios
+    // Generate reports
     const reporter = new Reporter(config);
     await reporter.generateReport(results);
 
-    // Exibir resumo
+    // Display summary
     Reporter.printSummary(results);
 
-    // Exibir alguns resultados
-    console.log('Primeiros resultados:');
+    // Display some results
+    console.log('First results:');
     console.log('');
 
     for (const result of results.slice(0, 5)) {
@@ -61,22 +61,22 @@ async function main() {
     }
 
     if (results.length > 5) {
-      console.log(`... e mais ${results.length - 5} assistants`);
+      console.log(`... and ${results.length - 5} more assistants`);
       console.log('');
     }
 
-    console.log(`📄 Relatórios salvos em: ${config.outputDir}`);
+    console.log(`📄 Reports saved to: ${config.outputDir}`);
     console.log('');
 
-    // Exit code baseado em falhas
+    // Exit code based on failures
     const failed = results.filter(r => r.status === 'failed').length;
     if (failed > 0) {
-      logger.warn(`${failed} assistants falharam. Verifique o relatório para detalhes.`);
+      logger.warn(`${failed} assistants failed. Check report for details.`);
       process.exit(1);
     }
 
   } catch (error: any) {
-    logger.error('Erro ao executar clonagem:', error);
+    logger.error('Error executing cloning:', error);
     process.exit(1);
   }
 }

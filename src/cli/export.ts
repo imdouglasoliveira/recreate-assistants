@@ -14,26 +14,26 @@ async function main() {
   console.log('');
 
   try {
-    // Carregar configuração (apenas source)
+    // Load configuration (source only)
     const config = loadConfig();
     logger.setLevel(config.logLevel);
 
-    logger.info('Exportando assistants da origem...');
+    logger.info('Exporting assistants from source...');
     console.log('');
 
-    // Criar provider
+    // Create provider
     const provider = new OpenAIProvider(
       config.srcApiKey,
       config.srcOrgId,
       config.srcProjectId
     );
 
-    // Listar assistants
-    const spinner = ora('Listando assistants...').start();
+    // List assistants
+    const spinner = ora('Listing assistants...').start();
     const assistants = await provider.listAllAssistants();
-    spinner.succeed(`Encontrados ${assistants.length} assistants`);
+    spinner.succeed(`Found ${assistants.length} assistants`);
 
-    // Preparar export
+    // Prepare export
     const exportData = {
       exported_at: new Date().toISOString(),
       source: {
@@ -43,7 +43,7 @@ async function main() {
       assistants,
     };
 
-    // Salvar arquivo
+    // Save file
     const outputDir = config.outputDir;
     await fs.mkdir(outputDir, { recursive: true });
 
@@ -57,17 +57,17 @@ async function main() {
       'utf-8'
     );
 
-    logger.success(`Export salvo: ${filepath}`);
+    logger.success(`Export saved: ${filepath}`);
     console.log('');
     console.log('═══════════════════════════════════════');
-    console.log(`Total exportados: ${assistants.length}`);
+    console.log(`Total exported: ${assistants.length}`);
     console.log('═══════════════════════════════════════');
     console.log('');
-    console.log('💡 Para importar, use: npm run clone:import');
+    console.log('💡 To import, use: npm run clone:import');
     console.log('');
 
   } catch (error: any) {
-    logger.error('Erro ao exportar:', error);
+    logger.error('Error exporting:', error);
     process.exit(1);
   }
 }
