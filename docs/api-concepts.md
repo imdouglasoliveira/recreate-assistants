@@ -1,76 +1,76 @@
-# Conceitos Principais da API OpenAI
+# OpenAI API Concepts
 
-## Limitações de Transferência entre Organizations/Projects
+## Transfer Limitations Between Organizations/Projects
 
-**Recursos não são transferíveis diretamente entre projetos/organizations**:
-- Assistants, threads, files e vector stores são recursos "scoped" ao projeto
-- Não podem ser movidos entre projetos/organizations
-- Solução: recriar os recursos no destino
+**Resources cannot be directly transferred between projects/organizations:**
+- Assistants, threads, files, and vector stores are project-scoped resources
+- Cannot be moved between projects/organizations
+- Solution: Recreate resources in the destination
 
-**Referências:**
+**Reference:**
 - [OpenAI Help Center - Managing projects](https://help.openai.com/en/articles/9186755-managing-your-work-in-the-api-platform-with-projects)
 
-## Status da Assistants API
+## Assistants API Status
 
-⚠️ **IMPORTANTE**: A Assistants API está **deprecada** e tem data de descontinuação publicada:
-- **Sunset**: 1º semestre de 2026
-- **Recomendação**: Migrar para **Responses API**
-- Se estiver começando algo novo, considere já usar o modelo novo
+⚠️ **IMPORTANT**: The Assistants API is **deprecated** with a published sunset date:
+- **Sunset**: Q2 2026
+- **Recommendation**: Migrate to **Responses API**
+- If starting a new project, consider using the new model
 
-**Referências:**
-- [Assistants migration guide](https://platform.openai.com/docs/assistants/migration?utm_source=chatgpt.com)
+**References:**
+- [Assistants migration guide](https://platform.openai.com/docs/assistants/migration)
 - [Assistants API (v2) FAQ](https://help.openai.com/en/articles/8550641-assistants-api-v2-faq)
 
-## Autenticação e Organização
+## Authentication and Organization
 
 ### API Keys
 
-Você precisa de **duas API keys** para clonar entre organizations:
-1. **API key do projeto de origem**
-2. **API key do projeto de destino**
+You need **two API keys** to clone between organizations:
+1. **Source project API key**
+2. **Destination project API key**
 
-### Headers Obrigatórios
+### Required Headers
 
-Para todas as chamadas da Assistants API v2:
+For all Assistants API v2 calls:
 ```bash
 OpenAI-Beta: assistants=v2
 ```
 
-### Headers Opcionais para Multi-org
+### Optional Headers for Multi-org
 
-Quando você pertence a múltiplas organizations:
+When you belong to multiple organizations:
 - `OpenAI-Organization: org_...`
 - `OpenAI-Project: proj_...`
 
-**Dica**: Keys de projeto são normalmente o jeito mais simples de separar origem e destino.
+**Tip**: Project-scoped keys are usually the simplest way to separate source and destination.
 
-**Referências:**
-- [API Reference - Assistants](https://platform.openai.com/docs/api-reference/assistants?utm_source=chatgpt.com)
-- [Production best practices - Setting up organization](https://platform.openai.com/docs/guides/production-best-practices/setting-up-your-organization?utm_source=chatgpt.com)
+**References:**
+- [API Reference - Assistants](https://platform.openai.com/docs/api-reference/assistants)
+- [Production best practices - Setting up organization](https://platform.openai.com/docs/guides/production-best-practices/setting-up-your-organization)
 
 ## Function Calling
 
-As **Functions** definidas no Assistant são apenas **definições** (schemas):
-- A OpenAI **não executa** suas funções
-- Ela apenas **sugere a chamada** baseado no contexto
-- **Você** é responsável por implementar o backend que executa as chamadas
+**Functions** defined in the Assistant are only **definitions** (schemas):
+- OpenAI does **not execute** your functions
+- It only **suggests calls** based on context
+- **You** are responsible for implementing the backend that executes the calls
 
-**Referências:**
-- [Assistants Function Calling](https://platform.openai.com/docs/assistants/tools/function-calling?utm_source=chatgpt.com)
+**Reference:**
+- [Assistants Function Calling](https://platform.openai.com/docs/assistants/tools/function-calling)
 
-## Rate Limiting e Quotas
+## Rate Limiting and Quotas
 
-### Limites Conhecidos
+### Known Limits
 
 **Vector Stores:**
-- 1 vector store por assistant
-- 10.000 arquivos por vector store
-- Limites de tamanho e storage
+- 1 vector store per assistant
+- 10,000 files per vector store
+- Size and storage limits apply
 
 **Rate Limits:**
-- Respeitar RPM (Requests Per Minute) padrões
-- GET/POST/DELETE possuem limites específicos
-- Implementar retries com backoff para 429/5xx
+- Respect standard RPM (Requests Per Minute)
+- GET/POST/DELETE have specific limits
+- Implement retries with backoff for 429/5xx errors
 
-**Referências:**
-- [Error codes](https://platform.openai.com/docs/guides/error-codes?utm_source=chatgpt.com)
+**Reference:**
+- [Error codes](https://platform.openai.com/docs/guides/error-codes)

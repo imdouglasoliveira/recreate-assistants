@@ -1,20 +1,20 @@
-# Guia de Clonagem de Assistants
+# Assistant Cloning Guide
 
-## Visão Geral
+## Overview
 
-Este documento explica como clonar/replicar Assistants entre Organizations/Projects da OpenAI.
+This document explains how to clone/replicate Assistants between OpenAI Organizations/Projects.
 
-## Processo de Clonagem
+## Cloning Process
 
-Para clonar um Assistant, siga estas etapas:
+To clone an Assistant, follow these steps:
 
-1. **Ler** a definição do Assistant na org/projeto de origem (API: listar + recuperar)
-2. **Criar** um novo Assistant na org/projeto de destino com os mesmos campos
-3. Se usar **File Search / Code Interpreter**, **recriar os recursos** (re-upar arquivos e recriar vector stores) e reatribuir ao novo assistant
+1. **Read** the Assistant definition from the source org/project (API: list + retrieve)
+2. **Create** a new Assistant in the destination org/project with the same fields
+3. If using **File Search / Code Interpreter**, **recreate resources** (re-upload files and recreate vector stores) and reassign to the new assistant
 
-## Endpoints da API
+## API Endpoints
 
-### 1. Listar Assistants na Origem
+### 1. List Assistants in Source
 
 ```bash
 curl "https://api.openai.com/v1/assistants?limit=100" \
@@ -22,7 +22,7 @@ curl "https://api.openai.com/v1/assistants?limit=100" \
   -H "OpenAI-Beta: assistants=v2"
 ```
 
-### 2. Recuperar Assistant Específico
+### 2. Retrieve Specific Assistant
 
 ```bash
 curl "https://api.openai.com/v1/assistants/$ASST_ID" \
@@ -30,7 +30,7 @@ curl "https://api.openai.com/v1/assistants/$ASST_ID" \
   -H "OpenAI-Beta: assistants=v2"
 ```
 
-### 3. Criar Assistant no Destino
+### 3. Create Assistant in Destination
 
 ```bash
 curl "https://api.openai.com/v1/assistants" \
@@ -38,17 +38,17 @@ curl "https://api.openai.com/v1/assistants" \
   -H "OpenAI-Beta: assistants=v2" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Clone do Assistant",
+    "name": "Cloned Assistant",
     "model": "gpt-4.1-mini",
-    "instructions": "Mesmas instruções...",
+    "instructions": "Same instructions...",
     "tools": [{"type":"file_search"}],
     "metadata": {"cloned_from":"'"$ASST_ID"'"}
   }'
 ```
 
-## Script Node.js para Clonagem
+## Node.js Cloning Script
 
-Este script copia **nome/instructions/model/tools/metadados**:
+This script copies **name/instructions/model/tools/metadata**:
 
 ```javascript
 // node clone-assistants.js
@@ -98,7 +98,7 @@ async function createAssistant(key, payload) {
 (async () => {
   const SRC_KEY = process.env.SRC_KEY;
   const DST_KEY = process.env.DST_KEY;
-  if (!SRC_KEY || !DST_KEY) throw new Error("Defina SRC_KEY e DST_KEY no ambiente.");
+  if (!SRC_KEY || !DST_KEY) throw new Error("Define SRC_KEY and DST_KEY environment variables.");
 
   const list = await listAllAssistants(SRC_KEY);
 
@@ -115,7 +115,7 @@ async function createAssistant(key, payload) {
       temperature: full.temperature,
       top_p: full.top_p,
       metadata: { ...(full.metadata || {}), cloned_from: full.id },
-      // NÃO copie tool_resources diretamente: ids não existem no destino
+      // DO NOT copy tool_resources directly: IDs don't exist in destination
     };
 
     const created = await createAssistant(DST_KEY, payload);
@@ -127,38 +127,38 @@ async function createAssistant(key, payload) {
 });
 ```
 
-## Campos Clonados
+## Cloned Fields
 
-O script acima clona os seguintes campos:
+The script above clones the following fields:
 
 - ✅ `name`
 - ✅ `description`
 - ✅ `model`
 - ✅ `instructions`
-- ✅ `tools` (incluindo Functions com schemas)
+- ✅ `tools` (including Functions with schemas)
 - ✅ `response_format`
 - ✅ `temperature`
 - ✅ `top_p`
-- ✅ `metadata` (com `cloned_from` adicionado)
+- ✅ `metadata` (with `cloned_from` added)
 
-## O Que NÃO é Clonado Automaticamente
+## What is NOT Automatically Cloned
 
-- ❌ `tool_resources` - IDs não existem no destino
-- ❌ Arquivos do File Search
+- ❌ `tool_resources` - IDs don't exist in destination
+- ❌ File Search files
 - ❌ Vector Stores
-- ❌ Arquivos do Code Interpreter
+- ❌ Code Interpreter files
 
-**Para clonar esses recursos, consulte:** [File Search e Code Interpreter](./file-search-code-interpreter.md)
+**To clone these resources, see:** [File Search and Code Interpreter](./file-search-code-interpreter.md)
 
-## Idempotência
+## Idempotency
 
-Para evitar duplicações, use `metadata.cloned_from`:
-- Adicione o ID do assistant original em `metadata.cloned_from`
-- Verifique se já existe um assistant com esse metadata antes de criar novo
-- Se existir, faça **update** ao invés de criar
+To avoid duplications, use `metadata.cloned_from`:
+- Add the original assistant ID to `metadata.cloned_from`
+- Check if an assistant with that metadata already exists before creating a new one
+- If exists, perform **update** instead of create
 
-## Referências
+## References
 
-- [API Reference - Assistants](https://platform.openai.com/docs/api-reference/assistants?utm_source=chatgpt.com)
-- [Assistants File Search](https://platform.openai.com/docs/assistants/tools/file-search?utm_source=chatgpt.com)
-- [Assistants Function Calling](https://platform.openai.com/docs/assistants/tools/function-calling?utm_source=chatgpt.com)
+- [API Reference - Assistants](https://platform.openai.com/docs/api-reference/assistants)
+- [Assistants File Search](https://platform.openai.com/docs/assistants/tools/file-search)
+- [Assistants Function Calling](https://platform.openai.com/docs/assistants/tools/function-calling)
