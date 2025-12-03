@@ -1,181 +1,106 @@
-# Quick Start - Replicador de Assistants
+# Quick Start
 
-## Instalação
+Get started with Recreate Assistants in 3 steps.
+
+## Installation
 
 ```bash
-# Clonar o repositório
-git clone <repo-url>
-cd recriar_assistants
-
-# Instalar dependências
 npm install
-```
-
-## Configuração
-
-1. Copie o arquivo de exemplo:
-```bash
 cp .env.example .env
 ```
 
-2. Edite o [.env](.env) e configure suas API keys:
+Edit [.env](.env):
 
 ```bash
-# OBRIGATÓRIAS
-OPENAI_SRC_API_KEY="sk-proj-..."  # API key do projeto de origem
-OPENAI_DST_API_KEY="sk-proj-..."  # API key do projeto de destino
-
-# Configure o modo de clonagem
-CLONE_MODE="all"  # all | by_id | by_name
+OPENAI_SRC_API_KEY="sk-proj-..."  # Source project key
+OPENAI_DST_API_KEY="sk-proj-..."  # Destination project key
+CLONE_MODE="all"                  # all | by_id | by_name
 ```
 
-## Uso
-
-### 1. Planejar (Dry-run)
-
-Visualize o que será clonado sem fazer alterações:
+## Basic Usage
 
 ```bash
+# Preview what will be cloned
 npm run clone:plan
-```
 
-### 2. Executar Clonagem
-
-Execute a clonagem real:
-
-```bash
+# Execute the clone
 npm run clone:apply
-```
 
-### 3. Exportar Snapshots
-
-Exporte assistants para JSON (backup/versionamento):
-
-```bash
+# Export to JSON backup
 npm run clone:export
 ```
 
-Arquivo será salvo em `./out/assistants-export-YYYY-MM-DD.json`
+## Clone Modes
 
-### 4. Importar de Snapshot
-
-Importe assistants de um arquivo JSON:
-
-```bash
-npm run clone:import ./out/assistants-export-2024-12-03.json
-```
-
-## Modos de Clonagem
-
-### Clonar Todos os Assistants
-
+**All Assistants**
 ```bash
 CLONE_MODE="all"
 ```
 
-### Clonar Apenas IDs Específicos
-
+**Specific IDs**
 ```bash
 CLONE_MODE="by_id"
-CLONE_IDS="asst_abc123,asst_def456,asst_xyz789"
+CLONE_IDS="asst_abc123,asst_def456"
 ```
 
-### Clonar por Nome (filtro)
-
+**By Name Pattern**
 ```bash
 CLONE_MODE="by_name"
-CLONE_NAME_PREFIX="Production"  # Clona assistants cujo nome contém "Production"
+CLONE_NAME_PREFIX="Production"
 ```
 
-## Features Opcionais
+## Optional Features
 
-### Clonar File Search (Vector Stores)
-
-⚠️ **Operação custosa em tempo e $$$**
-
+**File Search** (clones vector stores + files)
 ```bash
 INCLUDE_FILE_SEARCH="true"
 ```
 
-Clona:
-- Vector stores
-- Todos os arquivos associados
-- Recria no destino
-
-### Clonar Code Interpreter
-
-⚠️ **Operação custosa em tempo e $$$**
-
+**Code Interpreter** (clones attached files)
 ```bash
 INCLUDE_CODE_INTERPRETER="true"
 ```
 
-Clona:
-- Arquivos anexados ao assistant
-- Re-upload no destino
-
-## Configurações Avançadas
-
-### Performance
-
+**Name Prefix** (adds prefix to cloned names)
 ```bash
-# Número máximo de operações paralelas
-MAX_CONCURRENCY="3"
-
-# Níveis: debug | info | warn | error
-LOG_LEVEL="info"
+CLONE_NAME_PREFIX="PROD - "
 ```
 
-### Dry Run
-
-Simula a clonagem sem fazer alterações:
-
+**Dry Run** (preview without changes)
 ```bash
 DRY_RUN="true"
 npm run clone:apply
 ```
 
-### Prefixo de Nome
-
-Adiciona prefixo aos nomes dos assistants clonados:
+## Configuration Options
 
 ```bash
-CLONE_NAME_PREFIX="PROD - "
+# Performance
+MAX_CONCURRENCY="3"        # Parallel operations limit
+LOG_LEVEL="info"           # debug | info | warn | error
+
+# Output
+OUTPUT_DIR="./out"         # Reports directory
 ```
 
-Resultado: `PROD - Customer Support Assistant`
+## Output Reports
 
-## Relatórios
+After cloning, check `./out/`:
 
-Após a clonagem, relatórios são gerados em `./out/`:
+- `mapping.json` - Complete ID mappings
+- `report.md` - Human-readable summary
 
-- **mapping.json**: Mapeamento completo (JSON)
-- **report.md**: Relatório formatado (Markdown)
-
-### Estrutura do mapping.json
+Example mapping structure:
 
 ```json
 {
   "cloned_at": "2024-12-03T10:30:00Z",
-  "source": {
-    "org_id": "org_xxx",
-    "project_id": "proj_xxx"
-  },
-  "destination": {
-    "org_id": "org_yyy",
-    "project_id": "proj_yyy"
-  },
   "mappings": [
     {
       "srcId": "asst_abc123",
       "dstId": "asst_xyz789",
       "name": "Customer Support",
-      "status": "success",
-      "operations": {
-        "assistant": "created",
-        "file_search": "cloned",
-        "code_interpreter": "skipped"
-      }
+      "status": "success"
     }
   ],
   "summary": {
@@ -186,67 +111,53 @@ Após a clonagem, relatórios são gerados em `./out/`:
 }
 ```
 
-## Exemplo Completo
+## Common Issues
+
+**Missing API Keys**
+```bash
+# Add to .env
+OPENAI_SRC_API_KEY="sk-proj-..."
+OPENAI_DST_API_KEY="sk-proj-..."
+```
+
+**Rate Limit (429)**
+```bash
+# Reduce concurrency
+MAX_CONCURRENCY="2"
+```
+
+**CLONE_IDS Required**
+```bash
+# For by_id mode
+CLONE_MODE="by_id"
+CLONE_IDS="asst_abc,asst_def"
+```
+
+## Complete Example
 
 ```bash
-# 1. Configure o .env
+# Configure
 cat > .env <<EOF
 OPENAI_SRC_API_KEY="sk-proj-..."
 OPENAI_DST_API_KEY="sk-proj-..."
 CLONE_MODE="all"
 DRY_RUN="false"
 INCLUDE_FILE_SEARCH="false"
-INCLUDE_CODE_INTERPRETER="false"
 MAX_CONCURRENCY="3"
-LOG_LEVEL="info"
-OUTPUT_DIR="./out"
 EOF
 
-# 2. Visualize o plano
+# Preview
 npm run clone:plan
 
-# 3. Execute a clonagem
+# Execute
 npm run clone:apply
 
-# 4. Verifique os relatórios
+# Check results
 cat ./out/report.md
 ```
 
-## Troubleshooting
+## Next Steps
 
-### Erro: Missing API Keys
-
-```
-OPENAI_SRC_API_KEY e OPENAI_DST_API_KEY são obrigatórias
-```
-
-**Solução**: Configure as keys no arquivo `.env`
-
-### Erro: Rate Limit (429)
-
-```
-[WARN] Retry attempt 1/3 after 1000ms
-```
-
-**Solução**: A ferramenta já faz retry automático. Se persistir, reduza `MAX_CONCURRENCY`.
-
-### Erro: CLONE_IDS não definido
-
-```
-CLONE_IDS não definido para modo by_id
-```
-
-**Solução**: Configure `CLONE_IDS` no `.env` quando usar `CLONE_MODE="by_id"`
-
-## Próximos Passos
-
-- Leia a [documentação completa](./docs/README.md)
-- Veja o [PRD/ADR](./docs/prd-adr.md) para detalhes arquiteturais
-- Consulte o [guia de implementação](./docs/guia-implementacao.md)
-
-## Suporte
-
-Para problemas e questões:
-- Verifique os logs estruturados
-- Consulte a [documentação](./docs/)
-- Revise os [error codes da OpenAI](https://platform.openai.com/docs/guides/error-codes)
+- See [README.md](README.md) for feature overview
+- Check [docs/](docs/) for technical specifications
+- Review [docs/prd-adr.md](docs/prd-adr.md) for architecture decisions
