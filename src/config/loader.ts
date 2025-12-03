@@ -8,7 +8,7 @@ dotenv.config();
  * Carrega configuração das variáveis de ambiente
  */
 export function loadConfig(): CloneConfig {
-  // Validar variáveis obrigatórias
+  // Validate required variables
   const srcApiKey = process.env.OPENAI_SRC_API_KEY;
   const dstApiKey = process.env.OPENAI_DST_API_KEY;
 
@@ -19,7 +19,7 @@ export function loadConfig(): CloneConfig {
     );
   }
 
-  // Validar modo de clonagem
+  // Validate clone mode
   const cloneMode = (process.env.CLONE_MODE || 'all') as 'all' | 'by_id' | 'by_name';
   if (!['all', 'by_id', 'by_name'].includes(cloneMode)) {
     throw new Error(`CLONE_MODE inválido: ${cloneMode}. Use: all, by_id ou by_name`);
@@ -41,7 +41,7 @@ export function loadConfig(): CloneConfig {
     throw new Error('MAX_CONCURRENCY deve ser um número maior que 0');
   }
 
-  // Validar log level
+  // Validate log level
   const logLevel = (process.env.LOG_LEVEL || 'info') as LogLevel;
   if (!['debug', 'info', 'warn', 'error'].includes(logLevel)) {
     throw new Error(`LOG_LEVEL inválido: ${logLevel}. Use: debug, info, warn ou error`);
@@ -70,7 +70,7 @@ export function loadConfig(): CloneConfig {
  * Valida a configuração
  */
 export function validateConfig(config: CloneConfig): void {
-  // Validações específicas por modo
+  // Mode-specific validations
   if (config.cloneMode === 'by_id' && (!config.cloneIds || config.cloneIds.length === 0)) {
     throw new Error('CLONE_IDS é obrigatório quando CLONE_MODE=by_id');
   }

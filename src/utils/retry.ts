@@ -17,7 +17,7 @@ const DEFAULT_OPTIONS: Required<RetryOptions> = {
 };
 
 /**
- * Executa uma função com retry exponential backoff
+ * Execute a function with exponential backoff retry
  */
 export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
@@ -32,18 +32,18 @@ export async function retryWithBackoff<T>(
     } catch (error: any) {
       lastError = error;
 
-      // Não retry se não for um erro retryable
+      // Do not retry if not a retryable error
       const statusCode = error?.status || error?.response?.status;
       if (statusCode && !opts.retryableErrors.includes(statusCode)) {
         throw error;
       }
 
-      // Última tentativa, não faz retry
+      // Last attempt, do not retry
       if (attempt === opts.maxRetries) {
         break;
       }
 
-      // Calcular delay com exponential backoff
+      // Calculate delay with exponential backoff
       const delay = Math.min(
         opts.initialDelay * Math.pow(opts.backoffMultiplier, attempt),
         opts.maxDelay

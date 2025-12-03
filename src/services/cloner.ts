@@ -92,10 +92,10 @@ export class AssistantCloner {
     try {
       logger.info(`Clonando assistant: ${srcAssistant.name} (${srcAssistant.id})`);
 
-      // Verificar se já existe
+      // Check if already exists
       const existing = await this.dstProvider.findByMetadata('cloned_from', srcAssistant.id);
 
-      // Preparar payload (sem tool_resources por enquanto)
+      // Prepare payload (without tool_resources for now)
       const payload: Omit<AssistantSnapshot, 'id'> = {
         name: this.config.cloneNamePrefix
           ? `${this.config.cloneNamePrefix}${srcAssistant.name}`
@@ -117,14 +117,14 @@ export class AssistantCloner {
       let dstAssistant: AssistantSnapshot;
 
       if (existing) {
-        // Atualizar existente
+        // Update existing
         logger.info(`Assistant já existe no destino, atualizando: ${existing.id}`);
         dstAssistant = await retryWithBackoff(() =>
           this.dstProvider.updateAssistant(existing.id, payload)
         );
         result.operations.assistant = 'updated';
       } else {
-        // Criar novo
+        // Create new
         dstAssistant = await retryWithBackoff(() =>
           this.dstProvider.createAssistant(payload)
         );
@@ -134,7 +134,7 @@ export class AssistantCloner {
       result.dstId = dstAssistant.id;
       logger.success(`Assistant clonado: ${srcAssistant.id} -> ${dstAssistant.id}`);
 
-      // Clonar File Search (se habilitado)
+      // Clone File Search (if enabled)
       if (this.config.includeFileSearch && srcAssistant.tool_resources?.file_search) {
         try {
           await this.cloneFileSearch(srcAssistant, dstAssistant);
@@ -145,7 +145,7 @@ export class AssistantCloner {
         }
       }
 
-      // Clonar Code Interpreter (se habilitado)
+      // Clone Code Interpreter (if enabled)
       if (this.config.includeCodeInterpreter && srcAssistant.tool_resources?.code_interpreter) {
         try {
           await this.cloneCodeInterpreter(srcAssistant, dstAssistant);
@@ -189,13 +189,13 @@ export class AssistantCloner {
 
       for (const file of files) {
         try {
-          // Baixar arquivo
+          // Download file
           const fileInfo = await this.srcProvider.getFile(file.id);
           const content = await retryWithBackoff(() =>
             this.srcProvider.downloadFileContent(file.id)
           );
 
-          // Upload no destino
+          // Upload to destination
           const newFile = await retryWithBackoff(() =>
             this.dstProvider.uploadFile(content, fileInfo.filename)
           );
@@ -207,7 +207,7 @@ export class AssistantCloner {
         }
       }
 
-      // Criar vector store no destino
+      // Create vector store in destination
       const newVs = await retryWithBackoff(() =>
         this.dstProvider.createVectorStore(`Clone of ${vs.name}`, newFileIds)
       );
@@ -216,7 +216,7 @@ export class AssistantCloner {
       logger.success(`Vector Store clonado: ${vsId} -> ${newVs.id}`);
     }
 
-    // Atualizar assistant com novos vector stores
+    // Update assistant with new vector stores
     await this.dstProvider.updateAssistant(dstAssistant.id, {
       tool_resources: {
         file_search: {
@@ -259,7 +259,7 @@ export class AssistantCloner {
       }
     }
 
-    // Atualizar assistant com novos arquivos
+    // Update assistant with new files
     await this.dstProvider.updateAssistant(dstAssistant.id, {
       tool_resources: {
         code_interpreter: {
